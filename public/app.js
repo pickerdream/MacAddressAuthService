@@ -290,8 +290,8 @@ async function init() {
     }
     
     if (!state.user) {
-      const { count } = await api('/api/setup/status');
-      if (count === 0) {
+      const { needsSetup } = await api('/api/setup/status');
+      if (needsSetup) {
         $('#setup-view').hidden = false; $('#login-view').hidden = true;
       } else {
         $('#login-view').hidden = false; $('#setup-view').hidden = true;

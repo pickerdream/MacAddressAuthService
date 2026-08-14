@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import session from 'express-session';
+import pgSession from 'connect-pg-simple';
 import bcrypt from 'bcryptjs';
 import pg from 'pg';
 import multer from 'multer';
@@ -20,7 +21,9 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) throw 
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const PostgresStore = pgSession(session);
 app.use(session({
+  store: new PostgresStore({ pool: pool, tableName: 'session' }),
   secret: process.env.SESSION_SECRET || 'development-only-change-this-secret',
   resave: false,
   saveUninitialized: false,
