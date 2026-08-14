@@ -36,6 +36,7 @@ const samlEnabled = Boolean((process.env.SAML_ENTRY_POINT || process.env.SAML_ME
 if (samlEnabled) {
   let entryPoint = process.env.SAML_ENTRY_POINT;
   let cert = process.env.SAML_CERT || 'dummy';
+  let certs = [];
 
   if (process.env.SAML_METADATA_URL) {
     try {
@@ -44,7 +45,6 @@ if (samlEnabled) {
       if (!res.ok) throw new Error(`Failed to fetch metadata: ${res.statusText}`);
       const xml = await res.text();
       
-      let certs = [];
       const certMatches = [...xml.matchAll(/<X509Certificate>([^<]+)<\/X509Certificate>/gi)];
       if (certMatches.length > 0) {
         certs = certMatches.map(m => m[1]);
