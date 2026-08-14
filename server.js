@@ -44,12 +44,14 @@ if (samlEnabled) {
       if (!res.ok) throw new Error(`Failed to fetch metadata: ${res.statusText}`);
       const xml = await res.text();
       
-      const certMatch = xml.match(/<X509Certificate>([^<]+)<\/X509Certificate>/i);
-      if (certMatch && certMatch[1]) {
-        cert = certMatch[1];
-        console.log('SAML Certificate successfully extracted from metadata.');
+      let certs = [];
+      const certMatches = [...xml.matchAll(/<X509Certificate>([^<]+)<\/X509Certificate>/gi)];
+      if (certMatches.length > 0) {
+        certs = certMatches.map(m => m[1]);
+        console.log(`SAML Certificate successfully extracted from metadata. Found ${certs.length} certificates.`);
       } else {
         console.warn('Warning: Could not find X509Certificate in SAML metadata.');
+        certs.push(process.env.SAML_CERT || 'dummy');
       }
       
       const entryPointMatch = xml.match(/<SingleSignOnService[^>]+Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"[^>]+Location="([^"]+)"/i) 
@@ -67,17 +69,22 @@ if (samlEnabled) {
   }
 
   const formatCertAsPem = (c) => {
+    if (!c) return '';
     const cleanCert = c.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
     const chunks = cleanCert.match(/.{1,64}/g);
     return chunks ? `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n` : '';
   };
 
+  const idpCerts = process.env.SAML_METADATA_URL && certs && certs.length > 0 
+                   ? certs.map(formatCertAsPem) 
+                   : [formatCertAsPem(process.env.SAML_CERT || 'dummy')];
+
   passport.use(new SamlStrategy({
     entryPoint: entryPoint,
     issuer: process.env.SAML_ISSUER,
     callbackUrl: process.env.SAML_CALLBACK_URL || `http://localhost:${port}/auth/saml/callback`,
-    idpCert: formatCertAsPem(cert),
-    cert: formatCertAsPem(cert),
+    idpCert: idpCerts,
+    cert: idpCerts,
     wantAssertionsSigned: false, // In production this should be true depending on IdP config
   }, (profile, done) => {
     return done(null, profile);
