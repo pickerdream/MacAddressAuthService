@@ -85,7 +85,12 @@ if (samlEnabled) {
     callbackUrl: process.env.SAML_CALLBACK_URL || `http://localhost:${port}/auth/saml/callback`,
     idpCert: idpCerts,
     cert: idpCerts,
-    wantAssertionsSigned: false, // In production this should be true depending on IdP config
+    wantAssertionsSigned: false,
+    wantAuthnResponseSigned: false,
+    signatureAlgorithm: 'sha256',
+    digestAlgorithm: 'sha256',
+    acceptedClockSkewMs: 300000, // 5 minutes
+    disableRequestedAuthnContext: true,
   }, (profile, done) => {
     return done(null, profile);
   }));
