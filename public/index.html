@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MacAddressAuth | 認証申請ポータル</title>
+  <link rel="icon" type="image/png" href="/icon8.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,17 +13,17 @@
 </head>
 <body>
   <main id="login-view" class="login-shell">
-    <section class="brand-panel"><span class="eyebrow">NETWORK ACCESS MANAGEMENT</span><h1>MacAddress<br><em>Auth</em></h1><p>認証を、迷わせない。<br>社内ネットワークの端末登録・承認ポータル。</p><div class="grid-mark"></div></section>
-    <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">SIGN IN</span><h2>おかえりなさい</h2><p class="muted">管理者から発行されたアカウントでログインしてください。</p></div><form id="login-form" class="stack"><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="you@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••"></label><p id="login-error" class="form-error" hidden></p><button class="button primary" type="submit">ログイン <span>→</span></button></form><div id="sso-container" hidden style="margin-top:20px; text-align:center;"><div style="margin-bottom:12px; font-size:0.875rem; color:var(--text-muted);">または</div><a href="/auth/saml/login" class="button secondary" style="width:100%; display:inline-block; text-align:center;">シングルサインオン (SAML) でログイン</a></div><p class="hint">初回管理者は環境設定後に作成できます。</p></section>
+    <section class="brand-panel"><img src="/icon-96.png" alt="Logo" style="display:block;width:64px;height:64px;margin-bottom:24px;"><span class="eyebrow">NETWORK ACCESS MANAGEMENT</span><h1>MacAddress<br><em>Auth</em></h1><p>ネットワークを高速で安全に。<br>ネットワーク端末登録・認証ポータル</p><div class="grid-mark"></div></section>
+    <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">SIGN IN</span><h2>ようこそ</h2><p class="muted">管理者から発行されたアカウントでログインしてください。</p></div><form id="login-form" class="stack"><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="you@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••"></label><p id="login-error" class="form-error" hidden></p><button class="button primary" type="submit">ログイン <span>→</span></button></form><div id="sso-container" hidden style="margin-top:20px; text-align:center;"><div style="margin-bottom:12px; font-size:0.875rem; color:var(--text-muted);">または</div><a href="/auth/saml/login" class="button secondary" style="width:100%; display:inline-block; text-align:center;">シングルサインオン (SAML) でログイン</a></div></section>
   </main>
   <main id="setup-view" class="login-shell" hidden>
-    <section class="brand-panel"><span class="eyebrow">FIRST TIME SETUP</span><h1>MacAddress<br><em>Auth</em></h1><p>最初の管理者アカウントを作成して、<br>認証端末の管理を始めましょう。</p><div class="grid-mark"></div></section>
+    <section class="brand-panel"><img src="/icon-96.png" alt="Logo" style="display:block;width:64px;height:64px;margin-bottom:24px;"><span class="eyebrow">FIRST TIME SETUP</span><h1>MacAddress<br><em>Auth</em></h1><p>最初の管理者アカウントを作成して、<br>認証端末の管理を始めましょう。</p><div class="grid-mark"></div></section>
     <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">STEP 1 OF 1</span><h2>初期設定</h2><p class="muted">このアカウントは管理者として作成されます。</p></div><form id="setup-form" class="stack"><label>管理者名<input name="displayName" required placeholder="例：ネットワーク管理者"></label><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="admin@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="10文字以上"></label><label>パスワード（確認）<input name="passwordConfirm" type="password" autocomplete="new-password" minlength="10" required placeholder="もう一度入力してください"></label><p id="setup-error" class="form-error" hidden></p><button class="button primary" type="submit">管理者を作成 <span>→</span></button></form></section>
   </main>
   <div id="app-view" hidden>
     <aside class="sidebar" id="sidebar">
       <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 11px 29px;">
-        <a class="logo" href="#" style="padding:0;"><span>◒</span> MacAddressAuth</a>
+        <div class="logo" style="padding:0; display:flex; align-items:center; gap:8px; cursor:default;"><img src="/icon8.png" style="width:24px;height:24px;" alt="logo"> MacAddressAuth</div>
         <button id="close-menu" class="mobile-only" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
       </div>
       <nav id="navigation">
@@ -46,6 +47,14 @@
       </header>
       <div id="toast" hidden></div><div id="page-content"></div>
     </section>
+  </div>
+  <div id="column-menu" class="column-menu" hidden>
+    <button class="column-menu-item" id="col-sort-asc">▲ 昇順に並び替え</button>
+    <button class="column-menu-item" id="col-sort-desc">▼ 降順に並び替え</button>
+    <div class="column-menu-divider"></div>
+    <div class="column-menu-search">
+      <input type="text" id="col-search-input" placeholder="検索...">
+    </div>
   </div>
   <script type="module" src="/app.js"></script>
 </body>
