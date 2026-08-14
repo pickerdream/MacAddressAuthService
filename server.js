@@ -27,7 +27,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'development-only-change-this-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 1000 * 60 * 60 * 8 },
+  cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 1000 * 60 * 60 * 8 },
 }));
 app.use(passport.initialize());
 app.use(express.static('public'));
