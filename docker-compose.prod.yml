@@ -32,7 +32,7 @@ services:
       # SAML_CERT: ${SAML_CERT}
       # SAML_CALLBACK_URL: ${SAML_CALLBACK_URL}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "3000:3000"
     networks:
       - internal
     depends_on:
