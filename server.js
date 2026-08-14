@@ -35,7 +35,7 @@ app.use(express.static('public'));
 const samlEnabled = Boolean(process.env.SAML_ENTRY_POINT && process.env.SAML_ISSUER);
 if (samlEnabled) {
   const formatCertAsPem = (cert) => {
-    const cleanCert = cert.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\s+/g, '');
+    const cleanCert = cert.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
     const chunks = cleanCert.match(/.{1,64}/g);
     return chunks ? `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n` : '';
   };
