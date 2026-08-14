@@ -34,11 +34,16 @@ app.use(express.static('public'));
 
 const samlEnabled = Boolean(process.env.SAML_ENTRY_POINT && process.env.SAML_ISSUER);
 if (samlEnabled) {
+  const formatCertAsPem = (cert) => {
+    const cleanCert = cert.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/\s+/g, '');
+    const chunks = cleanCert.match(/.{1,64}/g);
+    return chunks ? `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n` : '';
+  };
   passport.use(new SamlStrategy({
     entryPoint: process.env.SAML_ENTRY_POINT,
     issuer: process.env.SAML_ISSUER,
     callbackUrl: process.env.SAML_CALLBACK_URL || `http://localhost:${port}/auth/saml/callback`,
-    idpCert: process.env.SAML_CERT || 'dummy',
+    idpCert: formatCertAsPem(process.env.SAML_CERT || 'dummy'),
     wantAssertionsSigned: false, // In production this should be true depending on IdP config
   }, (profile, done) => {
     return done(null, profile);
