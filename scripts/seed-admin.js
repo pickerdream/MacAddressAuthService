@@ -6,7 +6,10 @@ import fs from 'node:fs/promises';
 const { Pool } = pg;
 const required = ['DATABASE_URL', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
 const missing = required.filter((key) => !process.env[key]);
-if (missing.length) throw new Error(`Missing environment values: ${missing.join(', ')}`);
+if (missing.length) {
+  console.log(`Skipping seed: Missing environment values for admin: ${missing.join(', ')}`);
+  process.exit(0);
+}
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 try {

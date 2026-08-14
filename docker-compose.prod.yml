@@ -19,7 +19,7 @@ services:
   app:
     image: ghcr.io/pickerdream/mac-address-auth-service:latest
     restart: unless-stopped
-    command: sh -c "npm run migrate && npm run seed && npm run start"
+    command: sh -c "npm run migrate && npm run start"
     environment:
       NODE_ENV: production
       PORT: 3000
