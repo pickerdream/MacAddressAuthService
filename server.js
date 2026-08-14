@@ -32,18 +32,52 @@ app.use(session({
 app.use(passport.initialize());
 app.use(express.static('public'));
 
-const samlEnabled = Boolean(process.env.SAML_ENTRY_POINT && process.env.SAML_ISSUER);
+const samlEnabled = Boolean((process.env.SAML_ENTRY_POINT || process.env.SAML_METADATA_URL) && process.env.SAML_ISSUER);
 if (samlEnabled) {
-  const formatCertAsPem = (cert) => {
-    const cleanCert = cert.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
+  let entryPoint = process.env.SAML_ENTRY_POINT;
+  let cert = process.env.SAML_CERT || 'dummy';
+
+  if (process.env.SAML_METADATA_URL) {
+    try {
+      console.log(`Fetching SAML Metadata from ${process.env.SAML_METADATA_URL}...`);
+      const res = await fetch(process.env.SAML_METADATA_URL);
+      if (!res.ok) throw new Error(`Failed to fetch metadata: ${res.statusText}`);
+      const xml = await res.text();
+      
+      const certMatch = xml.match(/<X509Certificate>([^<]+)<\/X509Certificate>/i);
+      if (certMatch && certMatch[1]) {
+        cert = certMatch[1];
+        console.log('SAML Certificate successfully extracted from metadata.');
+      } else {
+        console.warn('Warning: Could not find X509Certificate in SAML metadata.');
+      }
+      
+      const entryPointMatch = xml.match(/<SingleSignOnService[^>]+Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"[^>]+Location="([^"]+)"/i) 
+                           || xml.match(/<SingleSignOnService[^>]+Location="([^"]+)"[^>]+Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"/i)
+                           || xml.match(/<SingleSignOnService[^>]+Location="([^"]+)"/i);
+      if (entryPointMatch && entryPointMatch[1]) {
+        entryPoint = entryPointMatch[1];
+        console.log(`SAML EntryPoint successfully extracted: ${entryPoint}`);
+      } else {
+        console.warn('Warning: Could not find SingleSignOnService Location in SAML metadata.');
+      }
+    } catch (err) {
+      console.error('Error fetching SAML metadata:', err.message);
+    }
+  }
+
+  const formatCertAsPem = (c) => {
+    const cleanCert = c.replace(/-----BEGIN CERTIFICATE-----/g, '').replace(/-----END CERTIFICATE-----/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
     const chunks = cleanCert.match(/.{1,64}/g);
     return chunks ? `-----BEGIN CERTIFICATE-----\n${chunks.join('\n')}\n-----END CERTIFICATE-----\n` : '';
   };
+
   passport.use(new SamlStrategy({
-    entryPoint: process.env.SAML_ENTRY_POINT,
+    entryPoint: entryPoint,
     issuer: process.env.SAML_ISSUER,
     callbackUrl: process.env.SAML_CALLBACK_URL || `http://localhost:${port}/auth/saml/callback`,
-    idpCert: formatCertAsPem(process.env.SAML_CERT || 'dummy'),
+    idpCert: formatCertAsPem(cert),
+    cert: formatCertAsPem(cert),
     wantAssertionsSigned: false, // In production this should be true depending on IdP config
   }, (profile, done) => {
     return done(null, profile);

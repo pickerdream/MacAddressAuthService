@@ -62,13 +62,21 @@ Docker Desktop を使用して、手軽に動作確認が可能です。
 
 ## 🔑 シングルサインオン（SAML SSO）の連携
 
-本システムは SAML 2.0 に準拠した IdP (Identity Provider) とのシングルサインオンに対応しています。
+本システムは SAML 2.0 に準拠した IdP (Identity Provider: Entra ID等) とのシングルサインオンに対応しています。
 SSO を有効にするには、`.env` ファイル（または環境変数）に以下の設定を追加してください。
 
-*   `SAML_ENTRY_POINT`: IdP の SSO ログイン URL (例: `https://idp.example.com/saml2/idp/SSOService.php`)
+### 推奨：フェデレーション メタデータ URL を使用する方法
+Entra ID 等が提供するメタデータ URL を指定するだけで、起動時に自動的に証明書とログインURLを取得・設定します。
 *   `SAML_ISSUER`: 本サービスの識別子 (例: `mac-address-auth-service`)
-*   `SAML_CERT`: IdP の公開鍵証明書 (ヘッダー/フッターを含まない1行の文字列、または PEM 形式)
-*   `SAML_CALLBACK_URL` (任意): コールバックURLのオーバーライド
+*   `SAML_METADATA_URL`: IdP のフェデレーション メタデータ URL (例: `https://login.microsoftonline.com/.../federationmetadata.xml`)
+*   `SAML_CALLBACK_URL`: コールバック先のURL (例: `http://192.168.12.30:3000/auth/saml/callback`)
+
+### 代替：手動で証明書を設定する方法
+メタデータ URL が利用できない場合は、従来通り以下の設定を行ってください。
+*   `SAML_ENTRY_POINT`: IdP の SSO ログイン URL
+*   `SAML_ISSUER`: 本サービスの識別子
+*   `SAML_CERT`: IdP の公開鍵証明書 (Base64)
+*   `SAML_CALLBACK_URL`: コールバック先のURL
 
 > [!NOTE]
 > SSO が有効な場合、ログイン画面に「シングルサインオン (SAML) でログイン」ボタンが表示されます。
