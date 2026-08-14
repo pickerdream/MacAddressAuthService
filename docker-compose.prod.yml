@@ -17,17 +17,20 @@ services:
       retries: 12
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.production
+    image: ghcr.io/pickerdream/mac-address-auth-service:latest
     restart: unless-stopped
-    command: sh -c "npm run migrate && node server.js"
+    command: sh -c "npm run migrate && npm run seed && npm run start"
     environment:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL}
       SESSION_SECRET: ${SESSION_SECRET}
       RADIUS_MAC_FORMAT: ${RADIUS_MAC_FORMAT:-colon}
+      # SSO (SAML 2.0) Configuration
+      # SAML_ENTRY_POINT: ${SAML_ENTRY_POINT}
+      # SAML_ISSUER: ${SAML_ISSUER}
+      # SAML_CERT: ${SAML_CERT}
+      # SAML_CALLBACK_URL: ${SAML_CALLBACK_URL}
     ports:
       - "${APP_PORT:-3000}:3000"
     networks:

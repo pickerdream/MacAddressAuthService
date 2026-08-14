@@ -10,7 +10,7 @@ if (missing.length) throw new Error(`Missing environment values: ${missing.join(
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 try {
-  await pool.query(await fs.readFile(new URL('../db/schema.sql', import.meta.url), 'utf8'));
+  // DBのスキーマは npm run migrate によって初期化されるため、ここでは実行しません。
   const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12);
   await pool.query(
     `INSERT INTO users (email, display_name, password_hash, role)

@@ -51,12 +51,28 @@ Docker Desktop を使用して、手軽に動作確認が可能です。
     *   `SESSION_SECRET`: セッション暗号化キー（32文字以上のランダム文字列）
 3.  以下のコマンドで起動します。
     ```powershell
-    docker compose --env-file .env.production -f docker-compose.prod.yml up --build -d
+    docker compose --env-file .env.production -f docker-compose.prod.yml up -d
     ```
 4.  初回起動後、ブラウザで `http://localhost:3000` にアクセスすると**初期セットアップウィザード**が表示されます。画面の指示に従って最初の管理者ユーザーを作成してください。
 
 > [!WARNING]
 > 本番データベースのデータは `production-postgres-data` ボリュームに永続化されます。運用中は絶対に `docker compose -f docker-compose.prod.yml down -v`（`-v`オプション付き）を実行しないでください。データが全て消失します。
+
+---
+
+## 🔑 シングルサインオン（SAML SSO）の連携
+
+本システムは SAML 2.0 に準拠した IdP (Identity Provider) とのシングルサインオンに対応しています。
+SSO を有効にするには、`.env` ファイル（または環境変数）に以下の設定を追加してください。
+
+*   `SAML_ENTRY_POINT`: IdP の SSO ログイン URL (例: `https://idp.example.com/saml2/idp/SSOService.php`)
+*   `SAML_ISSUER`: 本サービスの識別子 (例: `mac-address-auth-service`)
+*   `SAML_CERT`: IdP の公開鍵証明書 (ヘッダー/フッターを含まない1行の文字列、または PEM 形式)
+*   `SAML_CALLBACK_URL` (任意): コールバックURLのオーバーライド
+
+> [!NOTE]
+> SSO が有効な場合、ログイン画面に「シングルサインオン (SAML) でログイン」ボタンが表示されます。
+> SAML 経由で初めてログインしたユーザーは自動的に「利用者」としてシステムに登録され、パスワード変更機能は無効化されます。
 
 ---
 
