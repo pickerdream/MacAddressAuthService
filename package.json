@@ -10,10 +10,15 @@
     "migrate": "node scripts/migrate.js"
   },
   "dependencies": {
+    "@node-saml/passport-saml": "^5.1.0",
     "bcryptjs": "^3.0.2",
+    "csv-parse": "^7.0.2",
+    "csv-stringify": "^6.8.3",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "express-session": "^1.18.1",
+    "multer": "^2.2.0",
+    "passport": "^0.7.0",
     "pg": "^8.16.3"
   }
 }

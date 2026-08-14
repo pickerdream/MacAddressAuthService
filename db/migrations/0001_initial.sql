@@ -37,13 +37,14 @@ CREATE TABLE IF NOT EXISTS devices (
   id BIGSERIAL PRIMARY KEY,
   owner_id BIGINT NOT NULL REFERENCES users(id),
   device_name TEXT NOT NULL,
-  mac_address TEXT NOT NULL UNIQUE,
+  mac_address TEXT NOT NULL,
   purpose_id BIGINT REFERENCES purposes(id),
   expires_at TIMESTAMPTZ,
   status TEXT NOT NULL CHECK (status IN ('active', 'disabled')) DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS devices_mac_address_active_key ON devices (mac_address) WHERE status = 'active';
 
 ALTER TABLE device_requests
   DROP CONSTRAINT IF EXISTS device_requests_device_id_fkey;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MAC Gate | 認証申請ポータル</title>
+  <title>MacAddressAuth | 認証申請ポータル</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,16 +12,40 @@
 </head>
 <body>
   <main id="login-view" class="login-shell">
-    <section class="brand-panel"><span class="eyebrow">NETWORK ACCESS MANAGEMENT</span><h1>MAC<br><em>Gate</em></h1><p>認証を、迷わせない。<br>社内ネットワークの端末登録・承認ポータル。</p><div class="grid-mark"></div></section>
-    <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">SIGN IN</span><h2>おかえりなさい</h2><p class="muted">管理者から発行されたアカウントでログインしてください。</p></div><form id="login-form" class="stack"><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="you@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••"></label><p id="login-error" class="form-error" hidden></p><button class="button primary" type="submit">ログイン <span>→</span></button></form><p class="hint">初回管理者は環境設定後に作成できます。</p></section>
+    <section class="brand-panel"><span class="eyebrow">NETWORK ACCESS MANAGEMENT</span><h1>MacAddress<br><em>Auth</em></h1><p>認証を、迷わせない。<br>社内ネットワークの端末登録・承認ポータル。</p><div class="grid-mark"></div></section>
+    <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">SIGN IN</span><h2>おかえりなさい</h2><p class="muted">管理者から発行されたアカウントでログインしてください。</p></div><form id="login-form" class="stack"><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="you@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="current-password" required placeholder="••••••••••"></label><p id="login-error" class="form-error" hidden></p><button class="button primary" type="submit">ログイン <span>→</span></button></form><div id="sso-container" hidden style="margin-top:20px; text-align:center;"><div style="margin-bottom:12px; font-size:0.875rem; color:var(--text-muted);">または</div><a href="/auth/saml/login" class="button secondary" style="width:100%; display:inline-block; text-align:center;">シングルサインオン (SAML) でログイン</a></div><p class="hint">初回管理者は環境設定後に作成できます。</p></section>
   </main>
   <main id="setup-view" class="login-shell" hidden>
-    <section class="brand-panel"><span class="eyebrow">FIRST TIME SETUP</span><h1>MAC<br><em>Gate</em></h1><p>最初の管理者アカウントを作成して、<br>認証端末の管理を始めましょう。</p><div class="grid-mark"></div></section>
+    <section class="brand-panel"><span class="eyebrow">FIRST TIME SETUP</span><h1>MacAddress<br><em>Auth</em></h1><p>最初の管理者アカウントを作成して、<br>認証端末の管理を始めましょう。</p><div class="grid-mark"></div></section>
     <section class="login-panel"><div><span class="signal"></span><span class="eyebrow">STEP 1 OF 1</span><h2>初期設定</h2><p class="muted">このアカウントは管理者として作成されます。</p></div><form id="setup-form" class="stack"><label>管理者名<input name="displayName" required placeholder="例：ネットワーク管理者"></label><label>メールアドレス<input name="email" type="email" autocomplete="email" required placeholder="admin@example.local"></label><label>パスワード<input name="password" type="password" autocomplete="new-password" minlength="10" required placeholder="10文字以上"></label><label>パスワード（確認）<input name="passwordConfirm" type="password" autocomplete="new-password" minlength="10" required placeholder="もう一度入力してください"></label><p id="setup-error" class="form-error" hidden></p><button class="button primary" type="submit">管理者を作成 <span>→</span></button></form></section>
   </main>
   <div id="app-view" hidden>
-    <aside class="sidebar"><a class="logo" href="#"><span>◒</span> MAC Gate</a><nav id="navigation"><button data-page="home" class="active">概要</button><button data-page="devices">端末一覧</button><button data-page="request">申請する</button><button data-page="requests">申請履歴</button><button data-page="review" data-admin-only>承認待ち <span class="nav-count" id="pending-count">0</span></button><button data-page="accounting" data-admin-only>接続ログ</button><button data-page="members" data-admin-only>メンバー管理</button></nav><div class="sidebar-user"><div class="avatar" id="avatar">A</div><div><strong id="user-name"></strong><small id="user-role"></small></div><button id="logout" class="logout-button" title="ログアウト">ログアウト <span>↗</span></button></div></aside>
-    <section class="content"><header><div><span id="page-kicker" class="eyebrow">OVERVIEW</span><h1 id="page-title">概要</h1></div><div id="header-action"></div></header><div id="toast" hidden></div><div id="page-content"></div></section>
+    <aside class="sidebar" id="sidebar">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 11px 29px;">
+        <a class="logo" href="#" style="padding:0;"><span>◒</span> MacAddressAuth</a>
+        <button id="close-menu" class="mobile-only" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <nav id="navigation">
+      <button data-page="home" class="active">概要</button>
+      <button data-page="devices">自分の端末</button>
+      <button data-page="all_devices" data-admin-only>全端末管理</button>
+      <button data-page="request">申請する</button>
+      <button data-page="requests">申請履歴</button>
+      <button data-page="review" data-admin-only hidden>承認待ち <span id="pending-count" class="badge">0</span></button>
+      <button data-page="members" data-admin-only hidden>メンバー管理</button>
+      <button data-page="accounting" data-admin-only hidden>接続ログ</button>
+      <button data-page="settings" data-admin-only hidden>システム設定</button>
+    </nav><div class="sidebar-user"><div class="avatar" id="avatar">A</div><div><strong id="user-name"></strong><small id="user-role"></small></div><button id="logout" class="logout-button" title="ログアウト">ログアウト <span>↗</span></button></div></aside>
+    <section class="content">
+      <header>
+        <div style="display:flex; align-items:center; gap: 12px;">
+          <button id="open-menu" class="mobile-only" style="background:none;border:none;font-size:24px;cursor:pointer;padding:0;">☰</button>
+          <div><span id="page-kicker" class="eyebrow">OVERVIEW</span><h1 id="page-title">概要</h1></div>
+        </div>
+        <div id="header-action"></div>
+      </header>
+      <div id="toast" hidden></div><div id="page-content"></div>
+    </section>
   </div>
   <script type="module" src="/app.js"></script>
 </body>
