@@ -1,0 +1,30 @@
+# ── Stage 1: dependency installer ──────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# ── Stage 2: production image ───────────────────────────────────
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+# 非 root ユーザーで実行（セキュリティ強化）
+USER node
+
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node package*.json ./
+COPY --chown=node:node server.js ./
+COPY --chown=node:node public ./public
+COPY --chown=node:node db ./db
+COPY --chown=node:node scripts ./scripts
+
+EXPOSE 3000
+
+# Docker がアプリの死活を監視する（/health エンドポイントを使用）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+
+CMD ["node", "server.js"]
