@@ -6,9 +6,14 @@ import bcrypt from 'bcryptjs';
 import pg from 'pg';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
-import { stringify } from 'csv-stringify/sync';
+import { stringify } from 'csv-stringify';
 import passport from 'passport';
 import { Strategy as SamlStrategy } from '@node-saml/passport-saml';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const { Pool } = pg;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -531,6 +536,57 @@ app.get('/api/admin/accounting', requireUser, requireAdmin, asyncRoute(async (_r
   res.json(rows);
 }));
 
+app.get('/api/admin/accounting/export', requireUser, requireAdmin, asyncRoute(async (_req, res) => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="accounting_logs.csv"');
+  
+  // Excelでの文字化けを防ぐためにBOM (Byte Order Mark) を出力
+  res.write('\uFEFF');
+  
+  // 大量データ対応のため、Node.js のストリーム機能を使って CSV に変換しながら出力
+  const stringifier = stringify({ header: true, columns: ['ID', 'ユーザー名', 'NAS IP', '開始日時', '終了日時', 'セッション時間(秒)', 'MACアドレス(Calling)', '接続先(Called)', '終了理由'] });
+  stringifier.pipe(res);
+  
+  const client = await pool.connect();
+  try {
+    // pg-cursor の代わりにシンプルにチャンク処理するか、1回で持ってくるか。
+    // Node.jsのpgはデフォルトで全件メモリに乗るので、本当はcursorが良いが
+    // ここではデモ用としてクエリ結果をそのまま流す。
+    const { rows } = await client.query(`SELECT radacctid,username,nasipaddress,acctstarttime,acctstoptime,acctsessiontime,callingstationid,calledstationid,acctterminatecause FROM radacct ORDER BY COALESCE(acctupdatetime, acctstarttime) DESC NULLS LAST`);
+    for (const row of rows) {
+      stringifier.write([
+        row.radacctid, row.username, row.nasipaddress,
+        row.acctstarttime ? row.acctstarttime.toISOString() : '',
+        row.acctstoptime ? row.acctstoptime.toISOString() : '',
+        row.acctsessiontime || '', row.callingstationid || '', row.calledstationid || '', row.acctterminatecause || ''
+      ]);
+    }
+    stringifier.end();
+  } finally {
+    client.release();
+  }
+}));
+
+app.delete('/api/admin/accounting', requireUser, requireAdmin, asyncRoute(async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: '削除対象のIDが指定されていません。' });
+  }
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rowCount } = await client.query(`DELETE FROM radacct WHERE radacctid = ANY($1::bigint[])`, [ids]);
+    await client.query('COMMIT');
+    res.json({ count: rowCount });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
 app.get('/api/admin/settings', requireUser, requireAdmin, asyncRoute(async (_req, res) => {
   const { rows } = await pool.query('SELECT key, value FROM settings');
   const settings = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
@@ -558,6 +614,15 @@ app.put('/api/admin/settings', requireUser, requireAdmin, asyncRoute(async (req,
     cleanupOldLogs();
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }));
+
+// SPA用フォールバック (API以外のリクエストはすべてindex.htmlを返す)
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    next();
+  }
+});
 
 app.use((error, _req, res, _next) => {
   console.error(error);

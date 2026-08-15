@@ -1,4 +1,4 @@
-const state = { user: null, page: 'home', devices: [], allDevices: [], requests: [], purposes: [], users: [], accounting: [], settings: {}, sort: { key: null, dir: 1 } };
+const state = { user: null, page: 'home', devices: [], allDevices: [], requests: [], purposes: [], users: [], accounting: [], settings: {}, sort: { key: null, dir: 1 }, filters: {}, activeMenu: null, pagination: { page: 1, limit: 30 } };
 const $ = (selector) => document.querySelector(selector);
 const api = async (path, options = {}) => {
   const response = await fetch(path, { headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
@@ -12,9 +12,21 @@ const date = (value) => value ? new Intl.DateTimeFormat('ja-JP', { dateStyle: 'm
 const status = (value) => `<span class="badge ${escape(value)}">${({active:'有効',disabled:'停止',pending:'承認待ち',approved:'承認済み',rejected:'却下',register:'登録',update:'変更',delete:'削除'})[value] || escape(value)}</span>`;
 function notice(message) { const t = $('#toast'); t.textContent = message; t.hidden = false; clearTimeout(notice.timer); notice.timer = setTimeout(() => t.hidden = true, 3200); }
 
+function filterData(rows, columns) {
+  if (Object.keys(state.filters).length === 0) return rows;
+  return rows.filter(row => {
+    return columns.every(c => {
+      const q = state.filters[c.sortKey || c.label];
+      if (!q) return true;
+      const text = String(c.value(row)).replace(/<[^>]*>?/gm, '').toLowerCase();
+      return text.includes(q.toLowerCase());
+    });
+  });
+}
+
 function sortData(rows, columns) {
   if (!state.sort.key) return rows;
-  const col = columns.find(c => c.sortKey === state.sort.key);
+  const col = columns.find(c => (c.sortKey || c.label) === state.sort.key);
   if (!col || !col.sortValue) return rows;
   return [...rows].sort((a, b) => {
     const va = col.sortValue(a);
@@ -28,26 +40,69 @@ function sortData(rows, columns) {
 function renderTable(rows, columns, options = {}) {
   const empty = options.empty || '表示するデータはありません。';
   const selectable = options.selectable;
-  if (!rows.length) return `<div class="empty">${empty}</div>`;
-  const sorted = sortData(rows, columns);
+  const doPaginate = options.paginate !== false; // デフォルトでページネーション有効
+  const filtered = filterData(rows, columns);
+  const sorted = sortData(filtered, columns);
 
   const headers = columns.map(c => {
-    let cls = '';
-    if (c.sortKey) {
-      cls = 'cursor-pointer select-none';
-      if (state.sort.key === c.sortKey) cls += state.sort.dir === 1 ? ' sorted-asc' : ' sorted-desc';
+    const key = c.sortKey || c.label;
+    const hasFilter = !!state.filters[key];
+    const isSorted = state.sort.key === key;
+    let cls = 'cursor-pointer select-none';
+    if (hasFilter) cls += ' has-filter';
+    let icon = '▾';
+    if (isSorted) icon = state.sort.dir === 1 ? '▲' : '▼';
+    else if (hasFilter) icon = '◒';
+    if (c.label === '操作' || !c.sortValue) {
+      return `<th>${c.label}</th>`;
     }
-    return `<th class="${cls}" ${c.sortKey ? `data-sort="${c.sortKey}"` : ''}>${c.label} ${state.sort.key === c.sortKey ? (state.sort.dir === 1 ? '▲' : '▼') : ''}</th>`;
+    return `<th class="${cls}" data-col="${key}">${c.label} ${icon}</th>`;
   }).join('');
 
-  const body = sorted.map(row => {
+  const selectAll = selectable ? `<th><input type="checkbox" id="check-all"></th>` : '';
+  const headHTML = `<thead><tr>${selectAll}${headers}</tr></thead>`;
+
+  if (!filtered.length) {
+    return `<div class="table-wrap"><table>${headHTML}<tbody><tr><td colspan="${columns.length + (selectable ? 1 : 0)}" class="empty">${empty}</td></tr></tbody></table></div>`;
+  }
+
+  let paginated = sorted;
+  let paginationHTML = '';
+  
+  if (doPaginate) {
+    const totalItems = sorted.length;
+    const limit = state.pagination.limit;
+    const totalPages = Math.ceil(totalItems / limit);
+    // ページ番号が範囲外にならないよう補正
+    if (state.pagination.page > totalPages) state.pagination.page = totalPages;
+    if (state.pagination.page < 1) state.pagination.page = 1;
+    
+    const page = state.pagination.page;
+    const startIdx = (page - 1) * limit;
+    paginated = sorted.slice(startIdx, startIdx + limit);
+    
+    const limits = [10, 30, 50].map(l => `<option value="${l}" ${l === limit ? 'selected' : ''}>${l}件表示</option>`).join('');
+    
+    paginationHTML = `
+      <div class="pagination">
+        <select class="per-page-select">${limits}</select>
+        <span class="pagination-info">${startIdx + 1} - ${Math.min(startIdx + limit, totalItems)} / ${totalItems} 件</span>
+        <div class="pagination-controls">
+          <button class="page-btn page-prev" ${page === 1 ? 'disabled' : ''}>前へ</button>
+          <span>${page} / ${totalPages}</span>
+          <button class="page-btn page-next" ${page === totalPages ? 'disabled' : ''}>次へ</button>
+        </div>
+      </div>
+    `;
+  }
+
+  const body = paginated.map(row => {
     const cols = columns.map(c => `<td>${c.value(row)}</td>`).join('');
     const check = selectable ? `<td><input type="checkbox" class="row-checkbox" value="${row.id}"></td>` : '';
     return `<tr>${check}${cols}</tr>`;
   }).join('');
 
-  const selectAll = selectable ? `<th><input type="checkbox" id="check-all"></th>` : '';
-  return `<div class="table-wrap"><table><thead><tr>${selectAll}${headers}</tr></thead><tbody>${body}</tbody></table></div>`;
+  return `<div class="table-wrap"><table>${headHTML}<tbody>${body}</tbody></table></div>${paginationHTML}`;
 }
 
 async function loadBase() { 
@@ -77,7 +132,18 @@ async function loadSettingsData() {
 }
 
 const appContent = {
-  home() { const active = state.devices.filter(x => x.status === 'active'); const pending = state.requests.filter(x => x.status === 'pending'); return `<div class="stats"><article class="stat lime"><span class="eyebrow">ACTIVE DEVICES</span><strong>${active.length}</strong><span>現在有効な認証端末</span></article><article class="stat"><span class="eyebrow">PENDING REQUESTS</span><strong>${pending.length}</strong><span>確認待ちの申請</span></article><article class="stat"><span class="eyebrow">ACCESS EXPIRES</span><strong>${active.filter(x => x.expires_at).length}</strong><span>期限が設定された端末</span></article></div><section class="card"><div class="split-head"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>最近の申請</h2></div><button class="small-button secondary" data-go="request">${state.user.role === 'admin' ? '新規登録' : '新しい申請'}</button></div>${renderTable(state.requests.slice(0,5), [{label:'種別',value:x=>status(x.type)},{label:'端末',value:x=>`<strong>${escape(x.device_name)}</strong><br><span class="mono">${escape(x.mac_address)}</span>`},{label:'状態',value:x=>status(x.status)},{label:'日時',value:x=>date(x.created_at)}])}</section>`; },
+  home() { 
+    const active = state.devices.filter(x => x.status === 'active'); 
+    const pending = state.requests.filter(x => x.status === 'pending'); 
+    
+    const statsHTML = `<div class="stats">
+      <article class="stat lime"><span class="eyebrow">ACTIVE DEVICES</span><strong>${active.length}</strong><span>現在有効な認証端末</span></article>
+      <article class="stat"><span class="eyebrow">PENDING REQUESTS</span><strong>${pending.length}</strong><span>確認待ちの申請</span></article>
+      <article class="stat"><span class="eyebrow">ACCESS EXPIRES</span><strong>${active.filter(x => x.expires_at).length}</strong><span>期限が設定された端末</span></article>
+    </div>`;
+
+    return `${statsHTML}<section class="card"><div class="split-head"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>最近の申請</h2></div><button class="small-button secondary" data-go="request">${state.user.role === 'admin' ? '新規登録' : '新しい申請'}</button></div>${renderTable(state.requests.slice(0,5), [{label:'種別',value:x=>status(x.type)},{label:'端末',value:x=>`<strong>${escape(x.device_name)}</strong><br><span class="mono">${escape(x.mac_address)}</span>`},{label:'状態',value:x=>status(x.status)},{label:'日時',value:x=>date(x.created_at)}], { paginate: false })}</section>`; 
+  },
   
   devices() { return `<section class="card"><div class="split-head"><div><span class="eyebrow">MY DEVICES</span><h2>自分の端末</h2></div><div class="actions"><button class="small-button primary" data-go="request">＋ 登録${state.user.role === 'admin' ? '' : '申請'}</button></div></div>
   <div class="actions" style="margin-bottom: 1rem;"><button class="small-button danger batch-btn" id="batch-delete" disabled>選択した端末を一括削除${state.user.role === 'admin' ? '' : '申請'}</button></div>
@@ -97,7 +163,7 @@ const appContent = {
     {label:'操作',value:x=>`<button class="small-button secondary" data-edit="${x.id}">変更</button> <button class="small-button danger" data-delete="${x.id}">削除</button>`}
   ], { selectable: true })}</section>`; },
 
-  request() { const device = state.editDevice; const admin = state.user.role === 'admin'; return `<section class="card form-card"><div class="split-head"><div><span class="eyebrow">DEVICE REQUEST</span><h2>${device ? `端末変更${admin ? '' : '申請'}` : `MACアドレス登録${admin ? '' : '申請'}`}</h2></div></div><div class="notice">MACアドレスは ${escape(state.radiusMacFormat)} 形式でFreeRADIUSに登録されます。</div><form id="request-form" class="form-grid"><input type="hidden" name="deviceId" value="${device?.id || ''}"><input type="hidden" name="type" value="${device ? 'update' : 'register'}"><label>申請者<input value="${escape(state.user.displayName)}" disabled></label><label class="wide">端末名<input name="deviceName" required value="${escape(device?.device_name || '')}" placeholder="例：Kouta のノートPC"></label><label>MACアドレス<input class="mono" name="macAddress" required value="${escape(device?.mac_address || '')}" placeholder="AA:BB:CC:DD:EE:FF"></label><label>利用期限（空欄なら無期限）<input name="expiresAt" type="datetime-local" value="${device?.expires_at ? new Date(device.expires_at).toISOString().slice(0,16) : ''}"></label><label class="wide">備考<textarea name="note" rows="4" placeholder="備考や補足事項があれば記載してください。"></textarea></label><div class="wide actions"><button type="button" class="button secondary" data-go="devices">キャンセル</button><button class="button primary">${admin ? '登録を実行する' : '申請を送る'} <span>→</span></button></div></form></section>
+  request() { const device = state.editDevice; const admin = state.user.role === 'admin'; return `<section class="card form-card"><div class="split-head"><div><span class="eyebrow">DEVICE REQUEST</span><h2>${device ? `端末変更${admin ? '' : '申請'}` : `MACアドレス登録${admin ? '' : '申請'}`}</h2></div></div><form id="request-form" class="form-grid"><input type="hidden" name="deviceId" value="${device?.id || ''}"><input type="hidden" name="type" value="${device ? 'update' : 'register'}"><label>申請者<input value="${escape(state.user.displayName)}" disabled></label><label class="wide">端末名<input name="deviceName" required value="${escape(device?.device_name || '')}" placeholder="例：Kouta のノートPC"></label><label>MACアドレス<input class="mono" name="macAddress" required value="${escape(device?.mac_address || '')}" placeholder="AA:BB:CC:DD:EE:FF"></label><label>利用期限（空欄なら無期限）<input name="expiresAt" type="datetime-local" value="${device?.expires_at ? new Date(device.expires_at).toISOString().slice(0,16) : ''}"></label><label class="wide">備考<textarea name="note" rows="4" placeholder="備考や補足事項があれば記載してください。"></textarea></label><div class="wide actions"><button class="button primary">${admin ? '登録を実行する' : '申請を送る'} <span>→</span></button></div></form></section>
   ${!device ? `<section class="card form-card" style="margin-top:20px"><div class="split-head"><div><span class="eyebrow">BATCH REQUEST</span><h2>CSV一括登録${admin ? '' : '申請'}</h2></div></div><form id="import-form" class="form-grid"><label class="wide">テンプレート<br><a href="/api/requests/template" download class="small-button secondary" style="display:inline-block;margin-top:8px">テンプレートCSVをダウンロード</a></label><label class="wide">CSVファイルを選択<input type="file" name="file" accept=".csv" required></label><div class="wide actions"><button type="submit" class="button primary" id="import-button">一括${admin ? '登録' : '申請'}する <span>→</span></button></div></form></section>` : ''}`; },
   
   requests() { return `<section class="card"><div class="split-head"><div><span class="eyebrow">REQUEST HISTORY</span><h2>申請履歴</h2></div></div>${renderTable(state.requests, [
@@ -117,14 +183,19 @@ const appContent = {
     {label:'操作',value:x=>`<div class="actions" style="flex-direction:column;gap:4px;align-items:stretch;"><input type="text" id="note-${x.id}" placeholder="コメント(任意)" style="padding:4px;font-size:12px;width:100%;box-sizing:border-box;"><div style="display:flex;gap:4px;justify-content:flex-end;"><button class="small-button danger" data-review="${x.id}:false">却下</button><button class="small-button primary" data-review="${x.id}:true">承認</button></div></div>`}
   ], { selectable: true })}</section>`; },
   
-  accounting() { return `<section class="card"><div class="split-head"><div><span class="eyebrow">RADIUS ACCOUNTING</span><h2>接続ログ</h2></div></div>
+  accounting() { return `<section class="card"><div class="split-head"><div><span class="eyebrow">RADIUS ACCOUNTING</span><h2>接続ログ</h2></div>
+    <div class="actions">
+      <a href="/api/admin/accounting/export" target="_blank" class="small-button secondary">CSVで一括ダウンロード</a>
+      <button class="small-button danger batch-btn" id="batch-accounting-delete" disabled>選択したログを削除</button>
+    </div>
+  </div>
   ${renderTable(state.accounting,[
     {label:'MAC / Username',sortKey:'mac',sortValue:x=>x.username,value:x=>`<span class="mono">${escape(x.username||x.callingstationid||'—')}</span>`},
     {label:'NAS',value:x=>escape(x.nasipaddress||'—')},
     {label:'開始',sortKey:'start',sortValue:x=>x.acctstarttime,value:x=>date(x.acctstarttime)},
     {label:'終了',sortKey:'stop',sortValue:x=>x.acctstoptime,value:x=>x.acctstoptime?date(x.acctstoptime):status('active')},
     {label:'セッション',sortKey:'session',sortValue:x=>x.acctsessiontime,value:x=>x.acctsessiontime?`${Math.floor(x.acctsessiontime/60)} 分`:'—'}
-  ], { empty: 'まだアカウンティングログはありません。' })}</section>`; },
+  ], { selectable: true, empty: 'まだアカウンティングログはありません。' })}</section>`; },
   
   members() { return `<section class="card"><div class="split-head"><div><span class="eyebrow">MEMBER DIRECTORY</span><h2>メンバー管理</h2></div><div class="actions"><button class="small-button danger batch-btn" id="batch-member-delete" disabled>一括削除</button><button class="small-button primary" id="add-member">＋ メンバー追加</button></div></div><div id="member-form" hidden></div>
   ${renderTable(state.users,[
@@ -154,12 +225,24 @@ function render() {
   bindPage(); 
 }
 
-async function go(page, device) { 
-  state.page=page; state.editDevice=page === 'request' ? device : null; 
+async function go(page, device = null, push = true) { 
+  state.page = page; 
+  state.editDevice = page === 'request' ? device : null; 
+  state.filters = {}; state.sort = { key: null, dir: 1 }; state.activeMenu = null;
+  state.pagination.page = 1;
+  
   if (page === 'members') await loadMembersData();
   if (page === 'accounting') await loadAccountingData();
   if (page === 'settings') await loadSettingsData();
   if ($('#sidebar')) $('#sidebar').classList.remove('open');
+  if ($('#column-menu')) $('#column-menu').hidden = true;
+  
+  if (push) {
+    const urlPath = page === 'home' ? '/' : `/${page}`;
+    if (window.location.pathname !== urlPath) {
+      window.history.pushState({ page, device }, '', urlPath);
+    }
+  }
   render(); 
 }
 
@@ -173,12 +256,30 @@ function bindPage() {
   
   if ($('#add-member')) $('#add-member').onclick = showMemberCreate;
   
-  document.querySelectorAll('th[data-sort]').forEach(th => th.onclick = () => {
-    const key = th.dataset.sort;
-    if (state.sort.key === key) state.sort.dir *= -1;
-    else { state.sort.key = key; state.sort.dir = 1; }
-    render();
+  document.querySelectorAll('th[data-col]').forEach(th => th.onclick = (e) => {
+    e.stopPropagation();
+    const key = th.dataset.col;
+    state.activeMenu = key;
+    const menu = $('#column-menu');
+    menu.hidden = false;
+    const rect = th.getBoundingClientRect();
+    menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    menu.style.left = `${rect.left + window.scrollX}px`;
+    const input = $('#col-search-input');
+    input.value = state.filters[key] || '';
+    input.focus();
   });
+  
+  const pagePrev = document.querySelector('.page-prev');
+  if (pagePrev) pagePrev.onclick = () => { state.pagination.page--; render(); };
+  const pageNext = document.querySelector('.page-next');
+  if (pageNext) pageNext.onclick = () => { state.pagination.page++; render(); };
+  const perPageSelect = document.querySelector('.per-page-select');
+  if (perPageSelect) perPageSelect.onchange = (e) => {
+    state.pagination.limit = Number(e.target.value);
+    state.pagination.page = 1;
+    render();
+  };
   
   if ($('#open-menu')) $('#open-menu').onclick = () => $('#sidebar').classList.add('open');
   if ($('#close-menu')) $('#close-menu').onclick = () => $('#sidebar').classList.remove('open');
@@ -204,6 +305,7 @@ function bindPage() {
   if ($('#batch-reject')) $('#batch-reject').onclick = () => batchReview(false);
   if ($('#batch-delete')) $('#batch-delete').onclick = () => batchDelete();
   if ($('#batch-member-delete')) $('#batch-member-delete').onclick = () => batchMemberDelete();
+  if ($('#batch-accounting-delete')) $('#batch-accounting-delete').onclick = () => batchAccountingDelete();
 
   const form=$('#request-form'); if(form) form.onsubmit=submitRequest; 
   const importForm=$('#import-form'); if(importForm) importForm.onsubmit=submitImport; 
@@ -260,6 +362,16 @@ async function batchMemberDelete() {
   } catch(e) { notice(e.message); }
 }
 
+async function batchAccountingDelete() {
+  const ids = getSelectedIds();
+  if (!ids.length) return;
+  if (!confirm(`選択した ${ids.length} 件の接続ログを削除しますか？\n（この操作は元に戻せません）`)) return;
+  try {
+    const res = await api('/api/admin/accounting', { method: 'DELETE', body: JSON.stringify({ ids }) });
+    await loadAccountingData(); render(); notice(`${res.count}件の接続ログを削除しました。`);
+  } catch(e) { notice(e.message); }
+}
+
 async function deleteMember(id) {
   const user = state.users.find(x => Number(x.id) === Number(id));
   if (!user) return;
@@ -290,6 +402,9 @@ async function init() {
     }
     
     if (!state.user) {
+      if (window.location.pathname !== '/login') {
+        window.history.replaceState(null, '', '/login');
+      }
       const { needsSetup } = await api('/api/setup/status');
       if (needsSetup) {
         $('#setup-view').hidden = false; $('#login-view').hidden = true;
@@ -310,12 +425,61 @@ async function init() {
     document.querySelectorAll('[data-admin-only]').forEach(x => x.hidden = state.user.role !== 'admin');
     await loadBase();
     if ($('#pending-count')) $('#pending-count').textContent = state.requests.filter(x => x.status === 'pending').length;
-    go('home');
+    
+    // URLから初期ページを決定
+    const path = window.location.pathname.replace(/^\//, '') || 'home';
+    const validPages = Object.keys(appContent);
+    const initialPage = validPages.includes(path) ? path : 'home';
+    go(initialPage, null, true); // replaceState的な意味合いも含めて初期表示
+    
   } catch(e) { notice(e.message); }
 }
+
+window.addEventListener('popstate', (e) => {
+  if (e.state && e.state.page) {
+    go(e.state.page, e.state.device || null, false);
+  } else {
+    const path = window.location.pathname.replace(/^\//, '') || 'home';
+    if (appContent[path]) go(path, null, false);
+  }
+});
 
 $('#login-form').onsubmit=async(e)=>{e.preventDefault();const f=new FormData(e.target);try{const s=await api('/api/login',{method:'POST',body:JSON.stringify(Object.fromEntries(f))});state.user=s.user;await init()}catch(e){$('#login-error').textContent=e.message;$('#login-error').hidden=false}};
 $('#setup-form').onsubmit=async(e)=>{e.preventDefault();const f=new FormData(e.target);if(f.get('password')!==f.get('passwordConfirm')){$('#setup-error').textContent='パスワードが一致しません。';$('#setup-error').hidden=false;return;}try{await api('/api/setup/initialize',{method:'POST',body:JSON.stringify({displayName:f.get('displayName'),email:f.get('email'),password:f.get('password')})});$('#setup-view').hidden=true;$('#login-view').hidden=false;$('#login-error').hidden=true;notice('管理者を作成しました。ログインしてください。')}catch(e){$('#setup-error').textContent=e.message;$('#setup-error').hidden=false}};
 $('#navigation').onclick=e=>{const page=e.target.dataset.page;if(page)go(page)};
 $('#logout').onclick=async()=>{await api('/api/logout',{method:'POST'});location.reload()};
+
+document.addEventListener('click', (e) => {
+  const menu = $('#column-menu');
+  if (!menu || menu.hidden) return;
+  if (!menu.contains(e.target) && !e.target.closest('th[data-col]')) {
+    menu.hidden = true;
+    state.activeMenu = null;
+  }
+});
+
+$('#col-sort-asc').onclick = () => {
+  if (state.activeMenu) {
+    state.sort = { key: state.activeMenu, dir: 1 };
+    state.pagination.page = 1;
+    render();
+  }
+};
+
+$('#col-sort-desc').onclick = () => {
+  if (state.activeMenu) {
+    state.sort = { key: state.activeMenu, dir: -1 };
+    state.pagination.page = 1;
+    render();
+  }
+};
+
+$('#col-search-input').oninput = (e) => {
+  if (state.activeMenu) {
+    state.filters[state.activeMenu] = e.target.value;
+    state.pagination.page = 1;
+    render();
+  }
+};
+
 init();
