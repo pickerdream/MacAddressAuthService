@@ -17,7 +17,7 @@ services:
       retries: 12
 
   app:
-    image: ghcr.io/pickerdream/mac-address-auth-service:latest
+    image: ghcr.io/pickerdream/macaddressauthservice
     restart: unless-stopped
     command: sh -c "npm run migrate && npm run start"
     environment:
